@@ -21,6 +21,8 @@ namespace Backend.Controllers
         {
             var todos = db.ToDos.Where(t => t.IsPublic).ToList();
 
+            if (todos.Count == 0) return Ok(new {});
+
             return Ok(todos);
         }
 

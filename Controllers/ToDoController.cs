@@ -18,18 +18,24 @@ namespace Backend.Controllers
         }
 
         [HttpGet("public")]
-        public IActionResult GetPublicToDos([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string status = "")
+        public IActionResult GetPublicToDos([FromQuery] int page = 1, [FromQuery] int pageSize = 10,
+                                            [FromQuery] string status = "all", [FromQuery] string? priority = null,
+                                            [FromQuery] string? search = null, [FromQuery] string sortDir = "desc",
+                                            [FromQuery] string? sortBy = "createdAt")
         {
-            return GetToDos(page, pageSize, status, true);
+            return GetToDos(page, pageSize, status, priority, search, sortDir, sortBy, true);
         }
 
         [HttpGet]
         [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public IActionResult GetToDos([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string status = "")
+        public IActionResult GetToDos([FromQuery] int page = 1, [FromQuery] int pageSize = 10,
+                                      [FromQuery] string status = "all", [FromQuery] string? priority = null,
+                                      [FromQuery] string? search = null, [FromQuery] string sortDir = "desc",
+                                      [FromQuery] string? sortBy = "createdAt")
         {
-            return GetToDos(page, pageSize, status, false);
+            return GetToDos(page, pageSize, status, priority, search, sortDir, sortBy, false);
         }
 
         [HttpPost]
@@ -41,6 +47,9 @@ namespace Backend.Controllers
         {
             if (String.IsNullOrEmpty(createToDoDTO.Title))
                 return BadRequest(new { error = "400", message = "Title is required" });
+         
+            if (createToDoDTO.Title.Length < 3 || createToDoDTO.Title.Length > 100)
+                return BadRequest(new { error = "400", message = "Title must be between 3 and 100 characters." });
 
             var userId = User.FindFirst("uid")?.Value;
 
@@ -53,7 +62,9 @@ namespace Backend.Controllers
                 Priority = createToDoDTO.Priority ?? "medium",
                 IsCompleted = false,
                 IsPublic = createToDoDTO.IsPublic,
-                DueDate = createToDoDTO.DueDate ?? null,
+                DueDate = createToDoDTO.DueDate.HasValue
+                    ? DateTime.SpecifyKind(createToDoDTO.DueDate.Value, DateTimeKind.Utc)
+                    : (DateTime?)null,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -90,19 +101,22 @@ namespace Backend.Controllers
             return Ok(todo);
         }
 
-        [HttpPut("{id}/{title}/{details}/{priority}/{dueDate}/{isPublic}/{isCompleted}")]
+        [HttpPut("{id}")]
         [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult UpdateToDo([FromRoute] string id, [FromRoute] UpdateToDoDTO updateToDoDTO)
+        public IActionResult UpdateToDo([FromRoute] string id, [FromBody] UpdateToDoDTO updateToDoDTO)
         {
             var todo = db.ToDos.FirstOrDefault(t => t.Id == id);
 
             if (todo == null)
                 return NotFound(new { error = "404", message = "ToDo not found" });
+
+            if (updateToDoDTO.Title != null && (updateToDoDTO.Title.Length < 3 || updateToDoDTO.Title.Length > 100))
+                return BadRequest(new { error = "400", message = "Title must be between 3 and 100 characters." });
 
             var userId = User.FindFirst("uid")?.Value;
             if (todo.UserId != userId)
@@ -112,8 +126,8 @@ namespace Backend.Controllers
             todo.Details = updateToDoDTO.Details ?? todo.Details;
             todo.Priority = updateToDoDTO.Priority ?? todo.Priority;
             todo.DueDate = updateToDoDTO.DueDate != default(DateTime) ? updateToDoDTO.DueDate : todo.DueDate;
-            todo.IsPublic = updateToDoDTO.IsPublic;
-            todo.IsCompleted = updateToDoDTO.IsCompleted;
+            todo.IsPublic = updateToDoDTO.IsPublic ?? todo.IsPublic;
+            todo.IsCompleted = updateToDoDTO.IsCompleted ?? todo.IsCompleted;
             todo.UpdatedAt = DateTime.UtcNow;
             
             db.ToDos.Update(todo);
@@ -129,7 +143,7 @@ namespace Backend.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult SetCompletionToDo([FromRoute] string id, SetCompletedToDoDTO setCompletedToDoDTO)
+        public IActionResult SetCompletionToDo([FromRoute] string id, [FromBody] SetCompletedToDoDTO setCompletedToDoDTO)
         {
             var todo = db.ToDos.FirstOrDefault(t => t.Id == id);
 
@@ -174,8 +188,17 @@ namespace Backend.Controllers
             return NoContent();
         }
 
-        private IActionResult GetToDos(int page, int pageSize, string status, bool isPublic)
+        private IActionResult GetToDos(int page, int pageSize, string status, string? priority,
+                                       string? search, string sortDir, string? sortBy, bool isPublic = false)
         {
+            if (page <= 0) return BadRequest(new { error = "400", message = "Page must be greater than 0" });
+            if (pageSize <= 0 || pageSize > 50) return BadRequest(new { error = "400", message = "PageSize must be greater than 0 and less than or equal to 50" });
+            if (!String.IsNullOrEmpty(status) && status != "all" && status != "active" && status != "completed") return BadRequest(new { error = "400", message = "Status must be 'all', 'active', or 'completed'" });
+            if (!String.IsNullOrEmpty(sortDir) && sortDir != "asc" && sortDir != "desc") return BadRequest(new { error = "400", message = "sortDir must be either 'asc' or 'desc'" });
+            if (!String.IsNullOrEmpty(priority) && priority != "low" && priority != "medium" && priority != "high") return BadRequest(new { error = "400", message = "Priority must be 'low', 'medium', or 'high'" });
+            if (search != null && search.Length > 100) return BadRequest(new { error = "400", message = "Search query must be less than or equal to 100 characters" });
+            if (!String.IsNullOrEmpty(sortBy) && sortBy != "createdAt" && sortBy != "dueDate" && sortBy != "priority" && sortBy != "title") return BadRequest(new { error = "400", message = "sortBy must be 'createdAt', 'dueDate', 'priority', or 'title'" });
+
             var query = db.ToDos.AsQueryable();
             int totalItems;
             int totalPages;
@@ -188,7 +211,49 @@ namespace Backend.Controllers
                 else if (status == "completed")
                     query = query.Where(t => t.IsCompleted);
             }
-    
+
+            if (!String.IsNullOrEmpty(priority))
+            {
+                if (priority == "low" || priority == "medium" || priority == "high")
+                    query = query.Where(t => t.Priority == priority);
+            }
+
+            if (!String.IsNullOrEmpty(search))
+            {
+                query = query.Where(t => t.Title.Contains(search));
+            }
+
+            if (!String.IsNullOrEmpty(sortBy))
+            {
+                switch (sortBy)
+                {
+                    case "createdAt":
+                        if (sortDir == "asc")
+                            query = query.OrderBy(t => t.CreatedAt);
+                        else
+                            query = query.OrderByDescending(t => t.CreatedAt);
+                        break;
+                    case "dueDate":
+                        if (sortDir == "asc")
+                            query = query.OrderBy(t => t.DueDate);
+                        else
+                            query = query.OrderByDescending(t => t.DueDate);
+                        break;
+                    case "priority":
+                        if (sortDir == "asc")
+                            query = query.OrderBy(t => t.Priority);
+                        else
+                            query = query.OrderByDescending(t => t.Priority);
+                        break;
+                    case "title":
+                        if (sortDir == "asc")
+                            query = query.OrderBy(t => t.Title);
+                        else
+                            query = query.OrderByDescending(t => t.Title);
+                        break;
+                }
+            }
+
             if (isPublic)
             {
                 query = query.Where(t => t.IsPublic);

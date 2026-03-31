@@ -2,6 +2,7 @@ using Backend.DTO.Auth;
 using Backend.Models;
 using Backend.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.RegularExpressions;
 
 namespace Backend.Controllers
 {
@@ -26,6 +27,13 @@ namespace Backend.Controllers
         {
             if (String.IsNullOrEmpty(registerDTO.Email) || String.IsNullOrEmpty(registerDTO.Password))
                 return BadRequest(new { error = "400", message = "Invalid email, password or display name" });
+
+            Regex validateEmailRegex = new Regex("^\\S+@\\S+\\.\\S+$");
+            if (registerDTO.Email.Length > 254 || validateEmailRegex.IsMatch(registerDTO.Email) == false)
+                return BadRequest(new { error = "400", message = "Email must be at most 254 characters long" });
+
+            if (registerDTO.Password.Length < 6 || registerDTO.Password.Length > 128)
+                return BadRequest(new { error = "400", message = "Password must be at least 6 characters long" });
 
             var existingUser = db.Users.FirstOrDefault(u => u.Email == registerDTO.Email);
             if (existingUser != null)
@@ -58,6 +66,13 @@ namespace Backend.Controllers
         {
             if (String.IsNullOrEmpty(loginDTO.Email) || String.IsNullOrEmpty(loginDTO.Password))
                 return BadRequest(new { error = "400", message = "Invalid email or password" });
+
+            Regex validateEmailRegex = new Regex("^\\S+@\\S+\\.\\S+$");
+            if (loginDTO.Email.Length > 254 || validateEmailRegex.IsMatch(loginDTO.Email) == false)
+                return BadRequest(new { error = "400", message = "Email must be at most 254 characters long" });
+
+            if (loginDTO.Password.Length < 6 || loginDTO.Password.Length > 128)
+                return BadRequest(new { error = "400", message = "Password must be at least 6 characters long" });
 
             var user = db.Users.FirstOrDefault(u => u.Email == loginDTO.Email && u.Password == loginDTO.Password);
             

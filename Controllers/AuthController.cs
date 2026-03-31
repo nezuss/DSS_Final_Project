@@ -18,14 +18,13 @@ namespace Backend.Controllers
             this.db = db;
         }
 
-        [HttpPost("/register")]
+        [HttpPost("register")]
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         public IActionResult Register(RegisterDTO registerDTO)
         {
-            if (String.IsNullOrEmpty(registerDTO.Email) || String.IsNullOrEmpty(registerDTO.Password) ||
-                String.IsNullOrEmpty(registerDTO.DisplayName))
+            if (String.IsNullOrEmpty(registerDTO.Email) || String.IsNullOrEmpty(registerDTO.Password))
                 return BadRequest(new { error = "400", message = "Invalid email, password or display name" });
 
             var existingUser = db.Users.FirstOrDefault(u => u.Email == registerDTO.Email);
@@ -51,7 +50,7 @@ namespace Backend.Controllers
             });
         }
 
-        [HttpPost("/login")]
+        [HttpPost("login")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]

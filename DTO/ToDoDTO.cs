@@ -5,7 +5,7 @@ namespace Backend.DTO
         public string Title { get; set; }
         public string Details { get; set; }
         public string Priority { get; set; }
-        public DateTime DueDate { get; set; }
+        public DateTime? DueDate { get; set; }
         public bool IsPublic { get; set; }
     }
 

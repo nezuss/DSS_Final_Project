@@ -2,6 +2,7 @@ using Backend.DTO;
 using Backend.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using System.Runtime.CompilerServices;
 
 namespace Backend.Controllers
 {
@@ -16,25 +17,19 @@ namespace Backend.Controllers
             this.db = db;
         }
 
-        [HttpGet("/public")]
-        public IActionResult GetPublicToDos()
+        [HttpGet("public")]
+        public IActionResult GetPublicToDos([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string status = "")
         {
-            var todos = db.ToDos.Where(t => t.IsPublic).ToList();
-
-            if (todos.Count == 0) return Ok(new {});
-
-            return Ok(todos);
+            return GetToDos(page, pageSize, status, true);
         }
 
         [HttpGet]
         [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public IActionResult GetToDos()
+        public IActionResult GetToDos([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string status = "")
         {
-            var todos = db.ToDos.Where(t => t.UserId == User.FindFirst("UserId").Value).ToList();
-
-            return Ok(todos);
+            return GetToDos(page, pageSize, status, false);
         }
 
         [HttpPost]
@@ -47,16 +42,18 @@ namespace Backend.Controllers
             if (String.IsNullOrEmpty(createToDoDTO.Title))
                 return BadRequest(new { error = "400", message = "Title is required" });
 
+            var userId = User.FindFirst("uid")?.Value;
+
             var todo = new ToDoModel
             {
                 Id = Guid.NewGuid().ToString(),
-                UserId = User.FindFirst("UserId").Value,
+                UserId = userId,
                 Title = createToDoDTO.Title,
                 Details = createToDoDTO.Details ?? "",
                 Priority = createToDoDTO.Priority ?? "medium",
                 IsCompleted = false,
                 IsPublic = createToDoDTO.IsPublic,
-                DueDate = createToDoDTO.DueDate,
+                DueDate = createToDoDTO.DueDate ?? null,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -86,7 +83,8 @@ namespace Backend.Controllers
             if (todo == null)
                 return NotFound(new { error = "404", message = "ToDo not found" });
 
-            if (todo.UserId != User.FindFirst("UserId").Value && !todo.IsPublic)
+            var userId = User.FindFirst("uid")?.Value;
+            if (todo.UserId != userId && !todo.IsPublic)
                 return StatusCode(403, new { error = "403", message = "You do not have access to this ToDo" });
 
             return Ok(todo);
@@ -106,7 +104,8 @@ namespace Backend.Controllers
             if (todo == null)
                 return NotFound(new { error = "404", message = "ToDo not found" });
 
-            if (todo.UserId != User.FindFirst("UserId").Value)
+            var userId = User.FindFirst("uid")?.Value;
+            if (todo.UserId != userId)
                 return StatusCode(403, new { error = "403", message = "You do not have access to this ToDo" });
 
             todo.Title = updateToDoDTO.Title ?? todo.Title;
@@ -137,7 +136,8 @@ namespace Backend.Controllers
             if (todo == null)
                 return NotFound(new { error = "404", message = "ToDo not found" });
 
-            if (todo.UserId != User.FindFirst("UserId").Value)
+            var userId = User.FindFirst("uid")?.Value;
+            if (todo.UserId != userId)
                 return StatusCode(403, new { error = "403", message = "You do not have access to this ToDo" });
 
             todo.IsCompleted = setCompletedToDoDTO.IsCompleted;
@@ -164,13 +164,54 @@ namespace Backend.Controllers
             if (todo == null)
                 return NotFound(new { error = "404", message = "ToDo not found" });
 
-            if (todo.UserId != User.FindFirst("UserId").Value)
+            var userId = User.FindFirst("uid")?.Value;
+            if (todo.UserId != userId)
                 return StatusCode(403, new { error = "403", message = "You do not have access to this ToDo" });
 
             db.ToDos.Remove(todo);
             db.SaveChanges();
 
             return NoContent();
+        }
+
+        private IActionResult GetToDos(int page, int pageSize, string status, bool isPublic)
+        {
+            var query = db.ToDos.AsQueryable();
+            int totalItems;
+            int totalPages;
+            List<ToDoModel> todos;
+    
+            if (!String.IsNullOrEmpty(status))
+            {
+                if (status == "active")
+                    query = query.Where(t => !t.IsCompleted);
+                else if (status == "completed")
+                    query = query.Where(t => t.IsCompleted);
+            }
+    
+            if (isPublic)
+            {
+                query = query.Where(t => t.IsPublic);
+                totalItems = query.Count();
+                totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
+                todos = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            }
+            else
+            {
+                var userId = User.FindFirst("uid")?.Value;
+                query = query.Where(t => t.UserId == userId);
+                totalItems = query.Count();
+                totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
+                todos = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            }
+
+            return Ok(new {
+                page,
+                pageSize,
+                totalItems,
+                totalPages,
+                items = todos
+            });
         }
     }
 }

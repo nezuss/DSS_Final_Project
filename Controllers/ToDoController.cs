@@ -202,6 +202,10 @@ namespace Backend.Controllers
                 return BadRequest(new { error = "400", message = "Search query must be less than or equal to 100 characters" });
             if (!String.IsNullOrEmpty(sortBy) && sortBy != "createdAt" && sortBy != "dueDate" && sortBy != "priority" && sortBy != "title")
                 return BadRequest(new { error = "400", message = "sortBy must be 'createdAt', 'dueDate', 'priority', or 'title'" });
+            if (!String.IsNullOrEmpty(dueFrom) && !DateTime.TryParse(dueFrom, out _))
+                return BadRequest(new { error = "400", message = "dueFrom must be a valid date" });
+            if (!String.IsNullOrEmpty(dueTo) && !DateTime.TryParse(dueTo, out _))
+                return BadRequest(new { error = "400", message = "dueTo must be a valid date" });
 
             var query = db.ToDos.AsQueryable();
             int totalItems;

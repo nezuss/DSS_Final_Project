@@ -21,10 +21,9 @@ namespace Backend.Controllers
         public IActionResult GetPublicToDos([FromQuery] int page = 1, [FromQuery] int pageSize = 10,
                                             [FromQuery] string status = "all", [FromQuery] string? priority = null,
                                             [FromQuery] string? search = null, [FromQuery] string sortDir = "desc",
-                                            [FromQuery] string? sortBy = "createdAt")
-        {
-            return GetToDos(page, pageSize, status, priority, search, sortDir, sortBy, true);
-        }
+                                            [FromQuery] string? sortBy = "createdAt", [FromQuery] string? dueFrom = null,
+                                            [FromQuery] string? dueTo = null)
+        { return GetToDos(page, pageSize, status, priority, search, sortDir, sortBy, dueFrom, dueTo, true); }
 
         [HttpGet]
         [Authorize]
@@ -33,10 +32,9 @@ namespace Backend.Controllers
         public IActionResult GetToDos([FromQuery] int page = 1, [FromQuery] int pageSize = 10,
                                       [FromQuery] string status = "all", [FromQuery] string? priority = null,
                                       [FromQuery] string? search = null, [FromQuery] string sortDir = "desc",
-                                      [FromQuery] string? sortBy = "createdAt")
-        {
-            return GetToDos(page, pageSize, status, priority, search, sortDir, sortBy, false);
-        }
+                                      [FromQuery] string? sortBy = "createdAt", [FromQuery] string? dueFrom = null,
+                                      [FromQuery] string? dueTo = null)
+        { return GetToDos(page, pageSize, status, priority, search, sortDir, sortBy, dueFrom, dueTo, false); }
 
         [HttpPost]
         [Authorize]
@@ -189,20 +187,32 @@ namespace Backend.Controllers
         }
 
         private IActionResult GetToDos(int page, int pageSize, string status, string? priority,
-                                       string? search, string sortDir, string? sortBy, bool isPublic = false)
+                                       string? search, string sortDir, string? sortBy, string? dueFrom, string? dueTo, bool isPublic = false)
         {
             if (page <= 0) return BadRequest(new { error = "400", message = "Page must be greater than 0" });
-            if (pageSize <= 0 || pageSize > 50) return BadRequest(new { error = "400", message = "PageSize must be greater than 0 and less than or equal to 50" });
-            if (!String.IsNullOrEmpty(status) && status != "all" && status != "active" && status != "completed") return BadRequest(new { error = "400", message = "Status must be 'all', 'active', or 'completed'" });
-            if (!String.IsNullOrEmpty(sortDir) && sortDir != "asc" && sortDir != "desc") return BadRequest(new { error = "400", message = "sortDir must be either 'asc' or 'desc'" });
-            if (!String.IsNullOrEmpty(priority) && priority != "low" && priority != "medium" && priority != "high") return BadRequest(new { error = "400", message = "Priority must be 'low', 'medium', or 'high'" });
-            if (search != null && search.Length > 100) return BadRequest(new { error = "400", message = "Search query must be less than or equal to 100 characters" });
-            if (!String.IsNullOrEmpty(sortBy) && sortBy != "createdAt" && sortBy != "dueDate" && sortBy != "priority" && sortBy != "title") return BadRequest(new { error = "400", message = "sortBy must be 'createdAt', 'dueDate', 'priority', or 'title'" });
+            if (pageSize <= 0 || pageSize > 50)
+                return BadRequest(new { error = "400", message = "PageSize must be greater than 0 and less than or equal to 50" });
+            if (!String.IsNullOrEmpty(status) && status != "all" && status != "active" && status != "completed")
+                return BadRequest(new { error = "400", message = "Status must be 'all', 'active', or 'completed'" });
+            if (!String.IsNullOrEmpty(sortDir) && sortDir != "asc" && sortDir != "desc")
+                return BadRequest(new { error = "400", message = "sortDir must be either 'asc' or 'desc'" });
+            if (!String.IsNullOrEmpty(priority) && priority != "low" && priority != "medium" && priority != "high")
+                return BadRequest(new { error = "400", message = "Priority must be 'low', 'medium', or 'high'" });
+            if (search != null && search.Length > 100)
+                return BadRequest(new { error = "400", message = "Search query must be less than or equal to 100 characters" });
+            if (!String.IsNullOrEmpty(sortBy) && sortBy != "createdAt" && sortBy != "dueDate" && sortBy != "priority" && sortBy != "title")
+                return BadRequest(new { error = "400", message = "sortBy must be 'createdAt', 'dueDate', 'priority', or 'title'" });
 
             var query = db.ToDos.AsQueryable();
             int totalItems;
             int totalPages;
             List<ToDoModel> todos;
+
+            if (!String.IsNullOrEmpty(dueFrom) && DateTime.TryParse(dueFrom, out DateTime dueFromDate))
+                query = query.Where(t => t.DueDate >= dueFromDate);
+
+            if (!String.IsNullOrEmpty(dueTo) && DateTime.TryParse(dueTo, out DateTime dueToDate))
+                query = query.Where(t => t.DueDate <= dueToDate);
     
             if (!String.IsNullOrEmpty(status))
             {
@@ -213,18 +223,13 @@ namespace Backend.Controllers
             }
 
             if (!String.IsNullOrEmpty(priority))
-            {
                 if (priority == "low" || priority == "medium" || priority == "high")
                     query = query.Where(t => t.Priority == priority);
-            }
 
             if (!String.IsNullOrEmpty(search))
-            {
                 query = query.Where(t => t.Title.Contains(search));
-            }
 
             if (!String.IsNullOrEmpty(sortBy))
-            {
                 switch (sortBy)
                 {
                     case "createdAt":
@@ -252,7 +257,6 @@ namespace Backend.Controllers
                             query = query.OrderByDescending(t => t.Title);
                         break;
                 }
-            }
 
             if (isPublic)
             {

@@ -43,7 +43,7 @@ namespace Backend.Controllers
             {
                 Id = Guid.NewGuid().ToString(),
                 Email = registerDTO.Email,
-                Password = registerDTO.Password,
+                Password = BCrypt.Net.BCrypt.HashPassword(registerDTO.Password),
                 DisplayName = registerDTO.DisplayName,
                 CreatedAt = DateTime.UtcNow
             };
@@ -74,9 +74,10 @@ namespace Backend.Controllers
             if (loginDTO.Password.Length < 6 || loginDTO.Password.Length > 128)
                 return BadRequest(new { error = "400", message = "Password must be at least 6 characters long" });
 
-            var user = db.Users.FirstOrDefault(u => u.Email == loginDTO.Email && u.Password == loginDTO.Password);
-            
-            if (user == null) return Unauthorized(new { error = "401", message = "Invalid email or password" });
+            var user = db.Users.FirstOrDefault(u => u.Email == loginDTO.Email);
+
+            if (user == null || !BCrypt.Net.BCrypt.Verify(loginDTO.Password, user.Password))
+                return Unauthorized(new { error = "401", message = "Invalid email or password" });
 
             return Ok(new {
                 accessToken = tokenService.CreateAccessToken(user),

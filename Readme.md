@@ -1,6 +1,6 @@
 # How to run (total 2 types of run)
 
-> Forntend was made by Teacher (idk his github account name to add him in Contributors)
+> Forntend was made by Teacher (idk his github account name to add him in Contributors)  
 > Forntend file was edited `docker-compose.yml`. Field Jwt__Key - super_secret_dev_key_change_me to ThisIsASecretKeyForJwtTokenGeneration
 
 ---

@@ -51,10 +51,17 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// ? Migrations
+using (var scope = app.Services.CreateScope())
+{
+  var context = scope.ServiceProvider.GetRequiredService<DbModel>();
+  context.Database.Migrate();
+}
+
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+  app.UseSwagger();
+  app.UseSwaggerUI();
 }
 
 app.UseAuthorization();

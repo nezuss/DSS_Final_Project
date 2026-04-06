@@ -1,5 +1,6 @@
 using Backend.DTO;
 using Backend.Models;
+using Backend.Models.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using System.Runtime.CompilerServices;
@@ -44,10 +45,20 @@ namespace Backend.Controllers
         public IActionResult CreateToDo(CreateToDoDTO createToDoDTO)
         {
             if (String.IsNullOrEmpty(createToDoDTO.Title))
-                return BadRequest(new { error = "400", message = "Title is required" });
-         
+                return BadRequest(new ErrorModel {
+                  Type = "https://httpstatuses.com/400",
+                  Tittle = "Validation failed",
+                  StatusCode = 400,
+                  Errors = new ErrorDetails { Title = new string[] { "Title is required" } }
+                });
+
             if (createToDoDTO.Title.Length < 3 || createToDoDTO.Title.Length > 100)
-                return BadRequest(new { error = "400", message = "Title must be between 3 and 100 characters." });
+                return BadRequest(new ErrorModel {
+                  Type = "https://httpstatuses.com/400",
+                  Tittle = "Validation failed",
+                  StatusCode = 400,
+                  Errors = new ErrorDetails { Title = new string[] { "Title must be between 3 and 100 characters." } }
+                });
 
             var userId = User.FindFirst("uid")?.Value;
 
@@ -90,11 +101,21 @@ namespace Backend.Controllers
             var todo = db.ToDos.FirstOrDefault(t => t.Id == id);
 
             if (todo == null)
-                return NotFound(new { error = "404", message = "ToDo not found" });
+                return NotFound(new ErrorModel {
+                  Type = "https://httpstatuses.com/404",
+                  Tittle = "Not found",
+                  StatusCode = 404,
+                  Errors = new ErrorDetails { Title = new string[] { "ToDo not found" } }
+                });
 
             var userId = User.FindFirst("uid")?.Value;
             if (todo.UserId != userId && !todo.IsPublic)
-                return StatusCode(403, new { error = "403", message = "You do not have access to this ToDo" });
+                return StatusCode(403, new ErrorModel {
+                  Type = "https://httpstatuses.com/403",
+                  Tittle = "Forbidden",
+                  StatusCode = 403,
+                  Errors = new ErrorDetails { Title = new string[] { "You do not have access to this ToDo" } }
+                });
 
             return Ok(todo);
         }
@@ -111,14 +132,29 @@ namespace Backend.Controllers
             var todo = db.ToDos.FirstOrDefault(t => t.Id == id);
 
             if (todo == null)
-                return NotFound(new { error = "404", message = "ToDo not found" });
+                return NotFound(new ErrorModel {
+                  Type = "https://httpstatuses.com/404",
+                  Tittle = "Not found",
+                  StatusCode = 404,
+                  Errors = new ErrorDetails { Title = new string[] { "ToDo not found" } }
+                });
 
             if (updateToDoDTO.Title != null && (updateToDoDTO.Title.Length < 3 || updateToDoDTO.Title.Length > 100))
-                return BadRequest(new { error = "400", message = "Title must be between 3 and 100 characters." });
+                return BadRequest(new ErrorModel {
+                  Type = "https://httpstatuses.com/400",
+                  Tittle = "Bad request",
+                  StatusCode = 400,
+                  Errors = new ErrorDetails { Title = new string[] { "Title must be between 3 and 100 characters." } }
+                });
 
             var userId = User.FindFirst("uid")?.Value;
             if (todo.UserId != userId)
-                return StatusCode(403, new { error = "403", message = "You do not have access to this ToDo" });
+                return StatusCode(403, new ErrorModel {
+                  Type = "https://httpstatuses.com/403",
+                  Tittle = "Forbidden",
+                  StatusCode = 403,
+                  Errors = new ErrorDetails { Title = new string[] { "You do not have access to this ToDo" } }
+                });
 
             todo.Title = updateToDoDTO.Title ?? todo.Title;
             todo.Details = updateToDoDTO.Details ?? todo.Details;
@@ -127,7 +163,7 @@ namespace Backend.Controllers
             todo.IsPublic = updateToDoDTO.IsPublic ?? todo.IsPublic;
             todo.IsCompleted = updateToDoDTO.IsCompleted ?? todo.IsCompleted;
             todo.UpdatedAt = DateTime.UtcNow;
-            
+
             db.ToDos.Update(todo);
             db.SaveChanges();
 
@@ -146,11 +182,21 @@ namespace Backend.Controllers
             var todo = db.ToDos.FirstOrDefault(t => t.Id == id);
 
             if (todo == null)
-                return NotFound(new { error = "404", message = "ToDo not found" });
+                return NotFound(new ErrorModel {
+                  Type = "https://httpstatuses.com/404",
+                  Tittle = "Not found",
+                  StatusCode = 404,
+                  Errors = new ErrorDetails { Title = new string[] { "ToDo not found" } }
+                });
 
             var userId = User.FindFirst("uid")?.Value;
             if (todo.UserId != userId)
-                return StatusCode(403, new { error = "403", message = "You do not have access to this ToDo" });
+                return StatusCode(403, new ErrorModel {
+                  Type = "https://httpstatuses.com/403",
+                  Tittle = "Forbidden",
+                  StatusCode = 403,
+                  Errors = new ErrorDetails { Title = new string[] { "You do not have access to this ToDo" } }
+                });
 
             todo.IsCompleted = setCompletedToDoDTO.IsCompleted;
             todo.UpdatedAt = DateTime.UtcNow;
@@ -174,11 +220,22 @@ namespace Backend.Controllers
             var todo = db.ToDos.FirstOrDefault(t => t.Id == id);
 
             if (todo == null)
-                return NotFound(new { error = "404", message = "ToDo not found" });
+                return NotFound(new ErrorModel {
+                  Type = "https://httpstatuses.com/404",
+                  Tittle = "Not found",
+                  StatusCode = 404,
+                  Errors = new ErrorDetails { Title = new string[] { "ToDo not found" } }
+                });
+
 
             var userId = User.FindFirst("uid")?.Value;
             if (todo.UserId != userId)
-                return StatusCode(403, new { error = "403", message = "You do not have access to this ToDo" });
+                return StatusCode(403, new ErrorModel {
+                  Type = "https://httpstatuses.com/403",
+                  Tittle = "Forbidden",
+                  StatusCode = 403,
+                  Errors = new ErrorDetails { Title = new string[] { "You do not have access to this ToDo" } }
+                });
 
             db.ToDos.Remove(todo);
             db.SaveChanges();
@@ -191,21 +248,61 @@ namespace Backend.Controllers
         {
             if (page <= 0) return BadRequest(new { error = "400", message = "Page must be greater than 0" });
             if (pageSize <= 0 || pageSize > 50)
-                return BadRequest(new { error = "400", message = "PageSize must be greater than 0 and less than or equal to 50" });
+                return BadRequest(new ErrorModel {
+                  Type = "https://httpstatuses.com/400",
+                  Tittle = "Bad request",
+                  StatusCode = 400,
+                  Errors = new ErrorDetails { Title = new string[] { "PageSize must be greater than 0 and less than or equal to 50" } }
+                });
             if (!String.IsNullOrEmpty(status) && status != "all" && status != "active" && status != "completed")
-                return BadRequest(new { error = "400", message = "Status must be 'all', 'active', or 'completed'" });
+                return BadRequest(new ErrorModel {
+                  Type = "https://httpstatuses.com/400",
+                  Tittle = "Bad request",
+                  StatusCode = 400,
+                  Errors = new ErrorDetails { Title = new string[] { "Status must be 'all', 'active', or 'completed'" } }
+                });
             if (!String.IsNullOrEmpty(sortDir) && sortDir != "asc" && sortDir != "desc")
-                return BadRequest(new { error = "400", message = "sortDir must be either 'asc' or 'desc'" });
+                return BadRequest(new ErrorModel {
+                  Type = "https://httpstatuses.com/400",
+                  Tittle = "Bad request",
+                  StatusCode = 400,
+                  Errors = new ErrorDetails { Title = new string[] { "sortDir must be either 'asc' or 'desc'" } }
+                });
             if (!String.IsNullOrEmpty(priority) && priority != "low" && priority != "medium" && priority != "high")
-                return BadRequest(new { error = "400", message = "Priority must be 'low', 'medium', or 'high'" });
+                return BadRequest(new ErrorModel {
+                  Type = "https://httpstatuses.com/400",
+                  Tittle = "Bad request",
+                  StatusCode = 400,
+                  Errors = new ErrorDetails { Title = new string[] { "Priority must be 'low', 'medium', or 'high'" } }
+                });
             if (search != null && search.Length > 100)
-                return BadRequest(new { error = "400", message = "Search query must be less than or equal to 100 characters" });
+                return BadRequest(new ErrorModel {
+                  Type = "https://httpstatuses.com/400",
+                  Tittle = "Bad request",
+                  StatusCode = 400,
+                  Errors = new ErrorDetails { Title = new string[] { "Search query must be less than or equal to 100 characters" } }
+                });
             if (!String.IsNullOrEmpty(sortBy) && sortBy != "createdAt" && sortBy != "dueDate" && sortBy != "priority" && sortBy != "title")
-                return BadRequest(new { error = "400", message = "sortBy must be 'createdAt', 'dueDate', 'priority', or 'title'" });
+                return BadRequest(new ErrorModel {
+                  Type = "https://httpstatuses.com/400",
+                  Tittle = "Bad request",
+                  StatusCode = 400,
+                  Errors = new ErrorDetails { Title = new string[] { "sortBy must be 'createdAt', 'dueDate', 'priority', or 'title'" } }
+                });
             if (!String.IsNullOrEmpty(dueFrom) && !DateTime.TryParse(dueFrom, out _))
-                return BadRequest(new { error = "400", message = "dueFrom must be a valid date" });
+                return BadRequest(new ErrorModel {
+                  Type = "https://httpstatuses.com/400",
+                  Tittle = "Bad request",
+                  StatusCode = 400,
+                  Errors = new ErrorDetails { Title = new string[] { "dueFrom must be a valid date" } }
+                });
             if (!String.IsNullOrEmpty(dueTo) && !DateTime.TryParse(dueTo, out _))
-                return BadRequest(new { error = "400", message = "dueTo must be a valid date" });
+                return BadRequest(new ErrorModel {
+                  Type = "https://httpstatuses.com/400",
+                  Tittle = "Bad request",
+                  StatusCode = 400,
+                  Errors = new ErrorDetails { Title = new string[] { "dueTo must be a valid date" } }
+                });
 
             var query = db.ToDos.AsQueryable();
             int totalItems;
@@ -217,7 +314,7 @@ namespace Backend.Controllers
 
             if (!String.IsNullOrEmpty(dueTo) && DateTime.TryParse(dueTo, out DateTime dueToDate))
                 query = query.Where(t => t.DueDate <= dueToDate);
-    
+
             if (!String.IsNullOrEmpty(status))
             {
                 if (status == "active")
